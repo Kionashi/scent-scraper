@@ -1,1 +1,5 @@
 env/*
+.env
+db.sqlite3
+__init__.py
+*.pyc
