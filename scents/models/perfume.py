@@ -8,8 +8,8 @@ class Perfume(BaseModel):
 
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    desginer = models.ForeignKey("Designer", on_delete=models.CASCADE)
-    perfumists = models.ManyToManyField("Perfumist")
+    desginer = models.ForeignKey("Designer", on_delete=models.CASCADE, null=True, blank=True)
+    perfumers = models.ManyToManyField("Perfumer")
     accords = models.ManyToManyField("Accord",  through='PerfumeAccord', related_name='perfumes')
     ref_url = models.CharField(max_length=255, null=True, blank=True)
     image = models.ImageField(null=True, blank=True, upload_to='perfumes/')
