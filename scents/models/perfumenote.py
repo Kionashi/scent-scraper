@@ -6,9 +6,10 @@ class PerfumeNote(BaseModel):
         TOP = 'top'
         MID = 'mid'
         BOT = 'bot'
+        PLAIN = 'plain'
 
     perfume = models.ForeignKey('Perfume', on_delete=models.CASCADE)
     note = models.ForeignKey('Note', on_delete=models.CASCADE)
-    position = models.CharField(max_length=3, choices=Positions.choices, default=Positions.TOP)
+    position = models.CharField(max_length=5, choices=Positions.choices, default=Positions.PLAIN)
     class Meta:
-        db_table = 'perfume_note'
+        db_table = 'scents_perfume_note'

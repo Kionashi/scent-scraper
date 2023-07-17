@@ -6,4 +6,4 @@ class PerfumeAccord(BaseModel):
     accord = models.ForeignKey('Accord', on_delete=models.CASCADE)
     concentration = models.DecimalField(max_digits=5, decimal_places=2)
     class Meta:
-        db_table = 'perfume_accord'
+        db_table = 'scents_perfume_accord'
