@@ -1,4 +1,5 @@
 
+import time
 from rest_framework.decorators import action
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -12,19 +13,20 @@ class ScraperView(viewsets.ViewSet):
     @action(detail=False, methods=['GET'], url_path='test')
     def test(self,request):
 
-        perfume = self.scraper_service.perfume_detail('https://www.fragrantica.es/perfume/19-69/La-Habana-65418.html')
         total = 0
        
-        """  family_urls = self.scraper_service.family_list()
-        for family_url in family_urls:
-            perfume_urls = self.scraper_service.family_detail(family_url)
+        family_url_items = self.scraper_service.family_list()
+        for family_url_item in family_url_items:
+            print(family_url_item['url'])
+            family_id = int(family_url_item['family_id'])
+            perfume_urls = self.scraper_service.family_detail(family_url_item['url'])
             for perfume_url in perfume_urls:
                 perfume = self.scraper_service.perfume_detail(perfume_url['url'])
                 perfume.creation_year = perfume_url['year']
+                perfume.family_id = family_id
                 perfume.save()
-                print(f'perfume {perfume.name} created!')
-                total+=1 """
-
+                print(f'perfume {perfume.name} created/edited!')
+                total+=1
 
         return Response(f'Created {total} perfumes :D', status.HTTP_200_OK)
             

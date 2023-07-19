@@ -143,12 +143,12 @@ class ScraperService():
             print(f'error getting this perfume url {url}')
 
     def family_list(self) -> List[str]:
-        """ Scrap the family list to create all the families and get the a list of urls from all main family details which contains the links to every perfume detail"""
+        """ Scrap the family list to create all the families and get the a list of urls from all family details which contains the links to every perfume detail"""
         url = 'https://www.fragrantica.es/grupo/'
-        urls = []
+        results = []
         agent = {"User-Agent":"Mozilla/5.0"}
-        result = requests.get(url,headers=agent).text
-        doc = BeautifulSoup(result, "html.parser")
+        response = requests.get(url,headers=agent).text
+        doc = BeautifulSoup(response, "html.parser")
         if doc != None:
             sections = doc.find_all('div',class_="grid-x grid-padding-x")
             for section in sections:
@@ -161,25 +161,35 @@ class ScraperService():
                     parent.name = family_parent_name
                     parent.hero_image = family_parent_hero_image
                     parent.save()
-                children_tag = section[5].find_all('b')
+                url = section[3].find('a')['href']
+                url = self.set_base_url(url)
+                item = {
+                    'url': url,
+                    'family_id': parent.id
+                }
+                results.append(item)
+                children_tag = section[5].find_all('a')
                 for child_tag in children_tag:
-                    child = Family.objects.filter(name=child_tag.string).first()
+                    child_name = child_tag.find('b').string
+                    child_url = self.set_base_url(child_tag['href'])
+                    child = Family.objects.filter(name=child_name).first()
                     if not child:
                         child = Family()
-                        child.name = child_tag.string
+                        child.name = child_name
                         child.parent = parent
                         child.save()
-                url = section[3].find('a')['href']
-                if url.find('https://www.fragrantica.es') == -1:
-                    url = 'https://www.fragrantica.es'+url
-                urls.append(url) 
-            return urls
+                    item = {
+                        'url': child_url,
+                        'family_id': child.id
+                    }
+                    results.append(item)
+            return results
         else:
             print('===============ERROR================')
             print('Error getting family url')
 
-    def family_detail(self, family_url) ->List[dict]:
-        """ Scrap the family detail page and returns a list of all the urls to the details of every perfume in the list"""
+    def family_detail(self, family_url:str) ->List[dict]:
+        """ Scrap the family detail page and returns a list of all the urls to the details of every perfume in the list with the year of creation"""
         results = []
         agent = {"User-Agent":"Mozilla/5.0"}
         result = requests.get(family_url,headers=agent).text
@@ -189,8 +199,7 @@ class ScraperService():
             for card in cards:
                 item = {}
                 url = card.find('a')['href']
-                if url.find('https://www.fragrantica.es') == -1:
-                    url = 'https://www.fragrantica.es'+url
+                url = self.set_base_url(url)
                 item['url'] = url
                 item['year'] = card.find_all('span')[-1].string
                 results.append(item)
@@ -198,3 +207,8 @@ class ScraperService():
             print('===============ERROR================')
             print(f'Error getting this family url {family_url}')
         return results
+    
+    def set_base_url(self, url: str) ->str:
+        if url.find('https://www.fragrantica.es') == -1:
+            url = 'https://www.fragrantica.es'+url
+        return url
