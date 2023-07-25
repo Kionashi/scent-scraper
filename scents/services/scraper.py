@@ -1,4 +1,6 @@
 import decimal
+import random
+import time
 from typing import List
 from bs4 import BeautifulSoup
 import requests
@@ -15,11 +17,14 @@ from ..models.perfumer import Perfumer
 
 class ScraperService():
 
+    def __init__(self):
+        self.proxy_list = self.get_proxy_list()
+
     def perfume_detail(self, url: str) -> Perfume:  
         """ Scrap the given perfume detail url to create a new Perfume with all their related models"""
         print(f'Scraping this url {url}')
         agent = {"User-Agent":"Mozilla/5.0"} # Add User-Agent to bypass anti bot protections >:D #Hackerman
-        result = requests.get(url,headers=agent).text
+        result = requests.get(url,headers=agent, proxies={'http': random.choice(self.proxy_list)}).text
         doc = BeautifulSoup(result, "html.parser")
         if doc != None:
             perfume_name = doc.find("h1").text # Find the first element with <h1> tag and return the text inside that tag
@@ -54,8 +59,8 @@ class ScraperService():
                 designer = Designer()
                 designer.name = designer_name
                 designer.save()
-            else:
-                print('Designer actually exists!!')
+            # else:
+                # print('Designer actually exists!!')
             perfume.designer = designer
             
             perfume.save()
@@ -69,8 +74,8 @@ class ScraperService():
                     perfumer = Perfumer()
                     perfumer.name = perfumer_name
                     perfumer.save()
-                else:
-                    print('Perfumer actually exists!!')
+                # else:
+                    # print('Perfumer actually exists!!')
                 perfumers.append(perfumer)
             
             perfume.perfumers.set(perfumers) # Set perfumers
@@ -191,7 +196,8 @@ class ScraperService():
     def family_detail(self, family_url:str) ->List[dict]:
         """ Scrap the family detail page and returns a list of all the urls to the details of every perfume in the list with the year of creation"""
         results = []
-        agent = {"User-Agent":"Mozilla/5.0"}
+        user_agent = self.get_user_agent()
+        agent = {"User-Agent": user_agent}
         result = requests.get(family_url,headers=agent).text
         doc = BeautifulSoup(result, "html.parser")
         if doc != None:
@@ -212,3 +218,79 @@ class ScraperService():
         if url.find('https://www.fragrantica.es') == -1:
             url = 'https://www.fragrantica.es'+url
         return url
+
+    def get_user_agent(self) ->str:
+        
+        random_numner = random.randint(1,5)
+        if random_numner == 1:
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:100.0) Gecko/20100101 Firefox/100.0'
+        elif random_numner == 2:
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36'
+        elif random_numner == 3:
+            return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15'
+        elif random_numner == 4:
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36 Edg/100.0.0.0'
+        elif random_numner == 5:
+            return 'Opera/9.80 (Windows NT 10.0; Win64; x64) Presto/2.12.388 Version/12.18'
+        
+        return 'Opera/9.80 (Windows NT 10.0; Win64; x64) Presto/2.12.388 Version/12.18'
+    
+    def get_proxy_list(self):
+        """ Web scrap a free proxy website to return a list with valid proxies to rotate"""
+
+        print('Getting a proxy list')
+        url = 'https://free-proxy-list.net/'
+        results = []
+        agent = {"User-Agent":"Mozilla/5.0"}
+        response = requests.get(url,headers=agent).text
+        doc = BeautifulSoup(response, "html.parser")
+        if doc != None:
+            table_body = doc.find('tbody').find_all('tr')
+            for row in table_body:
+                results.append(row.find('td').string)
+        
+        return results
+    
+    def process_families(self, family_url_items: List):
+        try:
+            for index, family_url_item in enumerate(family_url_items):
+                print(family_url_item['url'])
+                family_id = int(family_url_item['family_id'])
+                perfume_urls = self.family_detail(family_url_item['url'])
+                self.process_perfumes(family_id,perfume_urls)
+            return index
+        except Exception as e:
+            print('Exception on family list')
+            print(e)
+
+    def process_perfumes(self, family_id: int, perfume_urls: List):
+        try:
+            count = 0
+            for perfume_url in perfume_urls:
+                if count >= 5:
+                    print('Sleeping...')
+                    time.sleep(800) # Sleep 13m-20s mins
+                    print('Restarting process...')
+                    count = 0
+                perfume = self.perfume_detail(perfume_url['url'])
+                perfume.creation_year = perfume_url['year'] if perfume_url['year'].isnumeric() else 0
+                if perfume.creation_year == 0:
+                    print('This perfume has no creation year')
+                perfume.family_id = family_id
+                perfume.save()
+                print(f'perfume {perfume.name} processed!')
+                count+=1
+                time.sleep(10)
+        except Exception as e:
+            print()
+            raise
+
+    def testing(self, namber=0):
+        local_namber=4
+        try:
+            namer+=1
+            local_namber+=1
+            raise Exception
+        except Exception as e:
+            print(f'Exception namber = {namber} - local = {local_namber}')
+            print(e)
