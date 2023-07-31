@@ -1,4 +1,5 @@
 import decimal
+import json
 import random
 import time
 from typing import List
@@ -23,10 +24,13 @@ class ScraperService():
     def perfume_detail(self, url: str) -> Perfume:  
         """ Scrap the given perfume detail url to create a new Perfume with all their related models"""
         print(f'Scraping this url {url}')
-        agent = {"User-Agent":"Mozilla/5.0"} # Add User-Agent to bypass anti bot protections >:D #Hackerman
+        # agent = {"User-Agent":"Mozilla/5.0"} # Add User-Agent to bypass anti bot protections >:D #Hackerman
+        user_agent = self.get_user_agent()
+        agent = {"User-Agent": user_agent}
         result = requests.get(url,headers=agent, proxies={'http': random.choice(self.proxy_list)}).text
+        print(f'this is the result {result}')
         doc = BeautifulSoup(result, "html.parser")
-        if doc != None:
+        if not doc:
             perfume_name = doc.find("h1").text # Find the first element with <h1> tag and return the text inside that tag
             perfume = Perfume.objects.filter(name=perfume_name).first()
             if not perfume:
@@ -193,7 +197,7 @@ class ScraperService():
             print('===============ERROR================')
             print('Error getting family url')
 
-    def family_detail(self, family_url:str) ->List[dict]:
+    def family_detail(self, family_url:str, family_id:int) ->List[dict]:
         """ Scrap the family detail page and returns a list of all the urls to the details of every perfume in the list with the year of creation"""
         results = []
         user_agent = self.get_user_agent()
@@ -208,6 +212,7 @@ class ScraperService():
                 url = self.set_base_url(url)
                 item['url'] = url
                 item['year'] = card.find_all('span')[-1].string
+                item['family_id'] = family_id
                 results.append(item)
         else:
             print('===============ERROR================')
@@ -253,37 +258,79 @@ class ScraperService():
     
     def process_families(self, family_url_items: List):
         try:
-            for index, family_url_item in enumerate(family_url_items):
+            all_perfume_urls = []
+            for family_url_item in family_url_items:
                 print(family_url_item['url'])
                 family_id = int(family_url_item['family_id'])
-                perfume_urls = self.family_detail(family_url_item['url'])
-                self.process_perfumes(family_id,perfume_urls)
-            return index
+                perfume_urls = self.family_detail(family_url_item['url'], family_id)
+                all_perfume_urls.extend(perfume_urls)
+                # self.process_perfumes(family_id,perfume_urls)
+            
+            with open('perfumes.json', 'w') as file:
+                json.dump(all_perfume_urls,file)
+            
+            return 'success'
         except Exception as e:
             print('Exception on family list')
             print(e)
+    
+    def test(self):
+        
+        with open('perfumes2.json','r') as test_file:
+            test_array2 = json.load(test_file)
+        
+        print(f'this is the array ==> {test_array2} and this is its time {type(test_array2)}')
+         
+        with open('perfumes2.json','w') as test_file:
+            json.dump(test_array2,test_file)
 
-    def process_perfumes(self, family_id: int, perfume_urls: List):
+
+    def process_perfumes(self, error_count=0):
+        with open('perfumes.json','r') as file:
+            perfume_urls = json.load(file)
+            total = len(perfume_urls)
         try:
             count = 0
-            for perfume_url in perfume_urls:
+            # for index, perfume_url in enumerate(perfume_urls):
+            while len(perfume_urls) > 0:
+                perfume_url = perfume_urls.pop()
                 if count >= 5:
-                    print('Sleeping...')
-                    time.sleep(800) # Sleep 13m-20s mins
-                    print('Restarting process...')
+                    # print('Sleeping...')
+                    # time.sleep(800) # Sleep 13m-20s mins
+                    # print('Restarting process...')
                     count = 0
                 perfume = self.perfume_detail(perfume_url['url'])
                 perfume.creation_year = perfume_url['year'] if perfume_url['year'].isnumeric() else 0
                 if perfume.creation_year == 0:
                     print('This perfume has no creation year')
-                perfume.family_id = family_id
+                perfume.family_id = perfume_url['family_id']
                 perfume.save()
-                print(f'perfume {perfume.name} processed!')
+                print(f'perfume {perfume.name} processed! now updating the file')
+                with open('perfumes.json','w') as file:
+                    json.dump(perfume_urls,file)
                 count+=1
                 time.sleep(10)
         except Exception as e:
-            print()
-            raise
+            print('Error processing perfumes')
+            print(e)
+            with open('perfumes.json','r') as file:
+                perfume_urls = json.load(file)
+                total_after = len(perfume_urls)
+            print(f'total : {total} total after : {total_after}')
+            if (total > total_after):
+                print('Sleeping before trying again')
+                time.sleep(300) # Sleep 5 mins
+                print('Recursive call')
+                self.process_perfumes()
+            else:
+                print('Persistent error')
+                if (error_count < 100):
+                    print(f'error count : {error_count}')
+                    time.sleep(2000) # Sleep 33 mins
+                    error_count+=1
+                    print(f'Trying again with error count = {error_count}')
+                    self.process_perfumes(error_count)
+                raise
 
     def testing(self, namber=0):
         local_namber=4
